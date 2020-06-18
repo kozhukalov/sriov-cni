@@ -70,6 +70,7 @@ func setupVF(conf *SriovConf, ifName string, netns ns.NetNS) error {
 	}
 
 	if args.VLAN != 0 {
+		fmt.Fprintf(os.Stderr, "CNI Sriov setting up vlan: %v for vf: %d\n", args.VLAN, vfIdx)
 		if err = netlink.LinkSetVfVlan(m, vfIdx, int(args.VLAN)); err != nil {
 			return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
 		}
@@ -137,6 +138,13 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(os.Stderr, "CNI Sriov CNI_CONTAINERID: %v\n", os.Getenv("CNI_CONTAINERID"))
+	fmt.Fprintf(os.Stderr, "CNI Sriov CNI_NETNS: %v\n", os.Getenv("CNI_NETNS"))
+	fmt.Fprintf(os.Stderr, "CNI Sriov CNI_IFNAME: %v\n", os.Getenv("CNI_IFNAME"))
+	fmt.Fprintf(os.Stderr, "CNI Sriov CNI_ARGS: %v\n", os.Getenv("CNI_ARGS"))
+	fmt.Fprintf(os.Stderr, "CNI Sriov stdin: %v\n", string(args.StdinData))
+
+	fmt.Fprintf(os.Stderr, "CNI Sriov using vlan tag %d\n", n.Args.VLAN)
 
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
@@ -202,12 +210,13 @@ func renameLink(curName, newName string) error {
 }
 
 func allocFreeVF(master string) (int, string, error) {
+	fmt.Fprintf(os.Stderr, "CNI Sriov trying to allocate free VF for: %v\n", master)
 	vfIdx := -1
 	devName := ""
 
 	sriovFile := fmt.Sprintf("/sys/class/net/%s/device/sriov_numvfs", master)
 	if _, err := os.Lstat(sriovFile); err != nil {
-		return -1, "", fmt.Errorf("failed to open the sriov_numfs of device %q: %v", master, err)
+		return -1, "", fmt.Errorf("failed to open the sriov_numvfs of device %q: %v", master, err)
 	}
 
 	data, err := ioutil.ReadFile(sriovFile)
@@ -246,6 +255,8 @@ func allocFreeVF(master string) (int, string, error) {
 }
 
 func getVFDeviceName(master string, vf int) (string, error) {
+	fmt.Fprintf(os.Stderr, "CNI Sriov check VF is available /sys/class/net/%s/device/virtfn%d/net/\n", master, vf)
+
 	vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net", master, vf)
 	if _, err := os.Lstat(vfDir); err != nil {
 		return "", fmt.Errorf("failed to open the virtfn%d dir of the device %q: %v", vf, master, err)
@@ -259,6 +270,7 @@ func getVFDeviceName(master string, vf int) (string, error) {
 	if len(infos) != 1 {
 		return "", fmt.Errorf("no network device in directory %s", vfDir)
 	}
+	fmt.Fprintf(os.Stderr, "CNI Sriov found free VF master= %s vf= %d infos= %s\n", master, vf, infos[0].Name())
 	return infos[0].Name(), nil
 }
 
